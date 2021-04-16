@@ -9,6 +9,8 @@
 
 namespace App\Controller;
 
+use App\Model\HomeManager;
+
 class HomeController extends AbstractController
 {
     /**
@@ -22,5 +24,15 @@ class HomeController extends AbstractController
     public function index()
     {
         return $this->twig->render('Home/index.html.twig');
+    }
+
+    public function signup()
+    {
+        return $this->twig->render('Home/signup.html.twig');
+    }
+
+    public function profile()
+    {
+        return $this->twig->render('Home/profile.html.twig');
     }
 }

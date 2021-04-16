@@ -1,0 +1,58 @@
+@import "score.css";
+@import "header.css";
+@import "department.css";
+@import "quizz.css";
+
+.btn-danger {
+    background-color: #E4002B !important;
+}
+
+.bg-danger{
+    background-color: #E4002B !important;
+}
+
+.bg-light{
+    background-color: #F2F2F2 !important;
+}
+
+.text-danger{
+    color : #01ACBA !important;
+}
+
+.btn-outline-danger{
+    background-color: #E4002B !important;
+}
+
+.btn-danger:hover {
+    color: #fff;
+    background-color: #01ACBA !important;
+    border-color: #01ACBA !important;
+}
+
+
+
+.container {
+    min-height: 100%;
+}
+
+
+.point-win {
+    position: absolute;
+    top: 2%;
+    left: 2%;
+    width: 20%;
+    height: 300px;
+}
+
+.point-win img{
+    width: 100%;
+    height: auto;
+    object-fit: cover;
+}
+
+h1 {
+    justify-content: center;
+    font-family: 'DM Serif Text', serif;
+    font-size: 54px;
+    color: #333333;
+}

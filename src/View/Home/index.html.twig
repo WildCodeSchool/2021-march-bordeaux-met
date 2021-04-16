@@ -1,5 +1,11 @@
 {% extends 'layout.html.twig' %}
 
-{% block content %}
-    <h1>Hello Wilder !</h1>
+{% block title %}
+    {{ parent() }} - Home !
 {% endblock %}
+
+
+{% block content %}
+{% include '/Component/_signin.html.twig' %}
+{% endblock %}
+
