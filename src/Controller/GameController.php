@@ -6,44 +6,47 @@ use App\Model\GameManager;
 use App\Model\DepartmentManager;
 use App\Model\ScoreManager;
 use App\Service\ConnexionAPI;
+use App\Service\GameDealer;
 
 class GameController extends AbstractController
 {
-    public function department()
+    public function department(): string
     {
+        if (!isset($_SESSION['pseudo'])) {
+            header('Location: /');
+        }
+
         $departmentManager = new DepartmentManager();
         $departments = $departmentManager->selectAll();
+        $_SESSION['numQuestion'] = 1;
+        $_SESSION['currentScore'] = 0;
+
         return $this->twig->render('Game/department.html.twig', ['departments' => $departments]);
     }
 
-    public function quizz($id)
+    public function quizz($departmentId): string
     {
+        $_SESSION['deptId'] = $departmentId;
+        $gameDealer = new GameDealer();
+        $initialErrorMargin = $gameDealer->getInitialGameErrorMargin();
+
+   /*     if ($_SESSION['gameStatus'] === 'Game Over') {
+                //TODO envoie best score
+
+        }*/
+
         $connexionAPI = new ConnexionAPI();
-
-        $pickedObjectData = $connexionAPI->showRandArtPiece($id);
-
+        $pickedObject = $connexionAPI->showRandArtPiece(intval($departmentId));
 
         return $this->twig->render(
             'Game/quizz.html.twig',
-            ['primaryImg' => $pickedObjectData['primaryImageSmall'],
-            'additionalImages' => $pickedObjectData['additionalImages'],
-            'id' => $id,
-            'department' => $pickedObjectData['department'],
-            'title' => $pickedObjectData['title'],
-            'artistDisplayName' => $pickedObjectData['artistDisplayName'],
-            'artistBeginDate' => $pickedObjectData['artistBeginDate'],
-            'artistEndDate' => $pickedObjectData['artistEndDate'],
-            'objectEndDate' => $pickedObjectData['objectEndDate'],
-            'objectId' => $pickedObjectData['objectId'],]
+            ['pickedObject' => $pickedObject,
+                'departmentId' => $departmentId,
+                'initialErrorMargin' => $initialErrorMargin]
         );
     }
 
-    public function rules()
-    {
-        return $this->twig->render('Game/rules.html.twig');
-    }
-
-    public function score($idSelected)
+    public function score($idSelected): string
     {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             //TODO POST data to secure
@@ -54,6 +57,7 @@ class GameController extends AbstractController
         $departments = $departmentManager->selectAll();
         $scoreManager = new ScoreManager();
         $scores = $scoreManager->getScoresByDepartment($idSelected);
+
         return $this->twig->render('Game/score.html.twig', [
             'departments' => $departments,
             'idSelected' => $idSelected,
@@ -65,13 +69,27 @@ class GameController extends AbstractController
     {
         if ($_SERVER['REQUEST_METHOD'] === "POST") {
             $connexionApi = new ConnexionAPI();
-            $objectData = $connexionApi->showObjectById($_POST['objectId']);
+            $objectData = $connexionApi->showObjectById(intval($_POST['objectId']));
+
+            $gameDealer = new GameDealer();
+            $questionStatus = $gameDealer->AnswerScoring(
+                $_SESSION['numQuestion'],
+                $_POST['answer'],
+                $objectData['objectEndDate']
+            );
+            $_SESSION['currentScore'] = $_SESSION['currentScore'] + $questionStatus['nbPoints'];
+            $_SESSION['gameStatus'] = $questionStatus['gameStatus'];
+            $_SESSION['numQuestion']++;
+            $_SESSION['currentErrorMargin'] = $questionStatus['currentErrorMargin'];
+
             return $this->twig->render(
                 'Game/solution.html.twig',
                 ['answer' => $_POST['answer'],
-                'objectData' => $objectData,
-                'deptId' => $_POST['department'],
-                    ]
+                    'objectData' => $objectData,
+                    'deptId' => $_POST['department'],
+                    'totalScore' => $_SESSION['currentScore'],
+                    'questionStatus' => $questionStatus
+                ]
             );
         }
         header('Location: /');
