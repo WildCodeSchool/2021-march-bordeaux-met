@@ -6,72 +6,28 @@ use App\Model\AbstractManager;
 use App\Model\AdminManager;
 use App\Model\DepartmentManager;
 use App\Model\GameAdminManager;
+use App\Model\LogManager;
 use App\Model\UserManager;
 use App\Service\FormChecker;
+use DateTime;
+use DateInterval;
 
 class AdminController extends AbstractController
 {
-    /**
-     * Display home page
-     *
-     * @return string
-     * @throws \Twig\Error\LoaderError
-     * @throws \Twig\Error\RuntimeError
-     * @throws \Twig\Error\SyntaxError
-     */
-    public function index(): string
+
+    public function deleteBadge(string $pseudo, string $id)
     {
         $adminManager = new AdminManager();
-        $users = $adminManager->selectAll();
-        return $this->twig->render('Admin/index.html.twig', [
-            'users' => $users
-        ]);
+        $adminManager->deleteBadge($pseudo, $id);
+        header('Location: /admin/show/' . $pseudo);
     }
 
-
-
-    public function edit(int $id): string
+    public function addBadge(string $pseudo, string $idBadge)
     {
         $adminManager = new AdminManager();
-        $user = $adminManager->selectOneById($id);
-
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            // clean $_POST data
-            $user = array_map('trim', $_POST);
-
-            // TODO validations (length, format...)
-
-            // if validation in ok, update and redirection
-            $adminManager->update($user);
-            header('Location: /admin/show/' . $id);
-        }
-        return $this->twig->render('Admin/edit.html.twig', [
-            'user' => $user,
-        ]);
-    }
-
-    public function add(): string
-    {
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $user = array_map('trim', $_POST);
-
-            // TODO validations (length, format...)
-
-            // if validation in ok, insert and redirection
-            $adminManager = new AdminManager();
-            $id = $adminManager->insert($user);
-            header('Location:/admin/show/' . $id);
-        }
-            return $this->twig->render('Admin/add.html.twig');
-    }
-
-    public function delete(int $id)
-    {
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $adminManager = new AdminManager();
-            $adminManager->delete($id);
-            header('Location:/admin/index.html.twig');
-        }
+        $idUser = $adminManager->getInfosByPseudo($pseudo)['profileInfo']['id'];
+        $adminManager->addBadge($idUser, $idBadge);
+        header('Location: /admin/show/' . $pseudo);
     }
 
     public function gamesetup(int $deptId)
@@ -83,6 +39,7 @@ class AdminController extends AbstractController
         }
         return $this->twig->render('Admin/gamesetup');
     }
+
     public function home()
     {
         if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
@@ -90,6 +47,7 @@ class AdminController extends AbstractController
         }
         $adminManager = new AdminManager();
         $names = $adminManager->getNames();
+        $badges = $adminManager->showAllbadgesAndUsers();
         $errors = [];
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $formChecker = new FormChecker($_POST);
@@ -106,16 +64,122 @@ class AdminController extends AbstractController
                 header('Location: /Admin/show/' . $search['pseudo']);
             }
         }
-
-        return $this->twig->render('/Admin/home.html.twig', [ 'errors' => $errors,'names' => $names]);
+        return $this->twig->render(
+            '/Admin/home.html.twig',
+            ['errors' => $errors, 'names' => $names, 'badges' => $badges]
+        );
     }
+
     public function show(string $pseudo)
     {
-        if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
-            header('Location: /');
-        }
         $adminManager = new AdminManager();
         $userData = $adminManager->getInfosByPseudo($pseudo);
         return $this->twig->render('/Admin/show.html.twig', ['user_data' => $userData]);
+    }
+
+    public function isAdmin($pseudo)
+    {
+        $adminManager = new AdminManager();
+        $adminManager->changeIsAdminSatus($pseudo);
+
+        header('Location: /admin/show/' . $pseudo);
+    }
+
+    public function changeAvatar(string $pseudo, string $avatarId)
+    {
+        $adminManager = new AdminManager();
+        $adminManager->changeAvatar($pseudo, $avatarId);
+
+        if ($_SESSION['pseudo'] === $pseudo) {
+            $_SESSION['avatar'] = $adminManager->getAvatarbiId($avatarId)['image'];
+        }
+        header('Location: /admin/show/' . $pseudo);
+    }
+
+    public function upload()
+    {
+        $adminManager = new AdminManager();
+        $errors = [];
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $uploadDir = 'assets/images/badges/';
+            $nextBadgeID = $adminManager->getNextBadgeId();
+            $uploadFile = $uploadDir . 'badge' . $nextBadgeID . '.png';
+            $extension = pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION);
+            $extensionsOk = ['png'];
+            $maxFileSize = 1000000;
+            if ((!in_array($extension, $extensionsOk))) {
+                $errors[] = 'Veuillez sélectionner une image de type png !';
+            }
+            if (file_exists($_FILES['image']['name']) && filesize($_FILES['image']['name']) > $maxFileSize) {
+                $errors[] = "Votre fichier doit faire moins de 1M !";
+            }
+            if (empty($errors)) {
+                move_uploaded_file($_FILES['image']['tmp_name'], $uploadFile);
+                $adminManager->insertBadge('badge' . $nextBadgeID . '.png');
+            }
+        }
+        $names = $adminManager->getNames();
+        $badges = $adminManager->showAllbadgesAndUsers();
+        return $this->twig->render(
+            '/Admin/home.html.twig',
+            ['anomalies' => $errors ,'names' => $names, 'badges' => $badges]
+        );
+    }
+
+    public function deleteBadgeById($badgeId)
+    {
+        $adminManager = new AdminManager();
+        $image = $adminManager->getBadgeImagebyId($badgeId);
+        if (unlink('assets/images/badges/' . $image)) {
+            $adminManager->deleteBadgebyImage($image);
+        };
+        $names = $adminManager->getNames();
+        $badges = $adminManager->showAllbadgesAndUsers();
+        return $this->twig->render('/Admin/home.html.twig', ['names' => $names, 'badges' => $badges]);
+    }
+    public function graph()
+    {
+        return $this->twig->render('/Admin/graph.html.twig');
+    }
+    public function graphData()
+    {
+        $content = trim(file_get_contents("php://input"));
+        $data = json_decode($content, true);
+        $logManager = new LogManager();
+        $startDate = new DateTime($data['startDate']);
+        $endDate = new DateTime($data['endDate']);
+        $realStartDate = min($startDate, $endDate);
+        $realEndDate = max($startDate, $endDate);
+        $realEndDate->add(new DateInterval('P1D'));
+
+        $logins = $logManager->countByLogNameAndByPeriod(
+            'login',
+            $realStartDate->format('Y/m/d'),
+            $realEndDate->format('Y/m/d')
+        );
+        $games = $logManager->countByLogNameAndByPeriod(
+            'End of Game',
+            $realStartDate->format('Y/m/d'),
+            $realEndDate->format('Y/m/d')
+        );
+        $newPlayers = $logManager->countByLogNameAndByPeriod(
+            'New signup',
+            $realStartDate->format('Y/m/d'),
+            $realEndDate->format('Y/m/d')
+        );
+        $response = [];
+        foreach ($logins as $login) {
+            $response['logins'] [$login['date']] = (int)$login['total'];
+        }
+        foreach ($games as $game) {
+            $response['games'] [$game['date']] = (int)$game['total'];
+        }
+        foreach ($newPlayers as $newPlayer) {
+            $response['newPlayers'] [$newPlayer['date']] = (int)$newPlayer['total'];
+        }
+        $response['startDate'] = $realStartDate->format('d/m/Y');
+        $response['endDate'] = $realEndDate->format('d/m/Y');
+
+        return json_encode($response);
     }
 }
