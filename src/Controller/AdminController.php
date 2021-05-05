@@ -57,8 +57,16 @@ class AdminController extends AbstractController
         }
         return $this->twig->render(
             '/Admin/home.html.twig',
-            ['errors' => $errors, 'names' => $names, 'badges' => $badges]
+            ['errors' => $errors, 'names' => json_encode($names), 'badges' => $badges]
         );
+    }
+
+    public function autocomplete($pseudo)
+    {
+        $userManager = new UserManager();
+        $pseudos = $userManager->searchPseudo($pseudo);
+        header('Content-Type: application/json');
+        return json_encode($pseudo ? $pseudos : []);
     }
 
     public function show(string $pseudo)
